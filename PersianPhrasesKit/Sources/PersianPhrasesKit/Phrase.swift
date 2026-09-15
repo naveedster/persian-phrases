@@ -1,42 +1,53 @@
 import Foundation
 
-public struct Phrase: Identifiable, Codable, Hashable, Sendable {
+public struct Phrase: Identifiable, Hashable, Sendable {
     public let id: String
-    public let persian: String
     public let english: String
-    public let transliteration: String
+    public let text: String
+    public let transliteration: String?
     public let category: Category
     public let formality: Formality?
     public let words: [Word]
+    public let language: LearningLanguage
+    public let source: Source
 
     public init(
         id: String,
-        persian: String,
         english: String,
-        transliteration: String,
+        text: String,
+        transliteration: String?,
         category: Category,
         formality: Formality? = nil,
-        words: [Word]
+        words: [Word],
+        language: LearningLanguage,
+        source: Source = .generated
     ) {
         self.id = id
-        self.persian = persian
         self.english = english
+        self.text = text
         self.transliteration = transliteration
         self.category = category
         self.formality = formality
         self.words = words
+        self.language = language
+        self.source = source
     }
 
-    /// Short Persian for circular Lock Screen widgets.
-    public var lockScreenPersian: String {
-        let compact = persian
+    public var showsTransliteration: Bool {
+        language.usesTransliteration && !(transliteration?.isEmpty ?? true)
+    }
+
+    /// Short learning-language text for circular Lock Screen widgets.
+    public var lockScreenText: String {
+        let compact = text
             .replacingOccurrences(of: "؟", with: "")
+            .replacingOccurrences(of: "?", with: "")
             .replacingOccurrences(of: "!", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if compact.count <= 12 {
-            return persian
+            return text
         }
-        return words.first?.persian ?? persian
+        return words.first?.text ?? text
     }
 
     /// English without a trailing formality note, for tiny accessory layouts.
@@ -46,6 +57,11 @@ public struct Phrase: Identifiable, Codable, Hashable, Sendable {
         }
         let head = english[..<idx].trimmingCharacters(in: .whitespaces)
         return head.isEmpty ? english : String(head)
+    }
+
+    public enum Source: String, Codable, Sendable {
+        case curated
+        case generated
     }
 }
 
@@ -85,28 +101,6 @@ public extension Phrase {
             }
         }
 
-        public var persianTitle: String {
-            switch self {
-            case .greetings: return "سلام و احوالپرسی"
-            case .polite: return "تعارفات"
-            case .food: return "غذا و نوشیدنی"
-            case .travel: return "سفر"
-            case .daily: return "روزمره"
-            case .shopping: return "خرید"
-            case .emergency: return "اضطراری"
-            case .time: return "زمان و اعداد"
-            case .weather: return "آب‌وهوا"
-            case .feelings: return "احساسات"
-            case .work: return "کار و درس"
-            case .family: return "خانواده"
-            case .health: return "سلامت"
-            }
-        }
-
-        public var bilingualTitle: String {
-            "\(persianTitle) · \(englishTitle)"
-        }
-
         public var symbolName: String {
             switch self {
             case .greetings: return "hand.wave"
@@ -136,24 +130,17 @@ public extension Phrase {
             case .informal: return "Informal"
             }
         }
-
-        public var persianLabel: String {
-            switch self {
-            case .formal: return "رسمی"
-            case .informal: return "غیررسمی"
-            }
-        }
     }
 
-    struct Word: Codable, Hashable, Sendable, Identifiable {
-        public let persian: String
-        public let transliteration: String
+    struct Word: Hashable, Sendable, Identifiable {
+        public let text: String
+        public let transliteration: String?
         public let english: String
 
-        public var id: String { "\(persian)|\(transliteration)|\(english)" }
+        public var id: String { "\(text)|\(transliteration ?? "")|\(english)" }
 
-        public init(persian: String, transliteration: String, english: String) {
-            self.persian = persian
+        public init(text: String, transliteration: String? = nil, english: String) {
+            self.text = text
             self.transliteration = transliteration
             self.english = english
         }

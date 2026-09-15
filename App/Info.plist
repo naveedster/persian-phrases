@@ -11,6 +11,7 @@
 			<string>com.persianphrases.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>dailyphrases</string>
 				<string>persianphrases</string>
 			</array>
 		</dict>

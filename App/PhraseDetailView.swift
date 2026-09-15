@@ -3,25 +3,40 @@ import PersianPhrasesKit
 
 struct PhraseDetailView: View {
     let phrase: Phrase
+    var autoPlay: Bool = false
+
+    private var rtl: Bool { phrase.language.isRightToLeft }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 translationCard
-                wordSection
+                if !phrase.words.isEmpty {
+                    wordSection
+                }
             }
             .padding(20)
         }
         .background(PhrasePalette.backgroundGradient.ignoresSafeArea())
         .navigationTitle(phrase.category.englishTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                SpeakButton(phrase: phrase)
+            }
+        }
+        .onAppear {
+            if autoPlay {
+                SpeechPlayer.shared.play(phrase)
+            }
+        }
     }
 
     private var header: some View {
-        VStack(alignment: .trailing, spacing: 12) {
+        VStack(alignment: rtl ? .trailing : .leading, spacing: 12) {
             HStack {
-                Label(phrase.category.bilingualTitle, systemImage: phrase.category.symbolName)
+                Label(phrase.category.englishTitle, systemImage: phrase.category.symbolName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(PhrasePalette.sage)
                 Spacer()
@@ -30,13 +45,13 @@ struct PhraseDetailView: View {
                 }
             }
 
-            Text(phrase.persian)
+            Text(phrase.text)
                 .font(.system(size: 36, weight: .semibold, design: .serif))
                 .foregroundStyle(PhrasePalette.deepTerracotta)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .environment(\.layoutDirection, .rightToLeft)
-                .environment(\.locale, Locale(identifier: "fa"))
+                .multilineTextAlignment(rtl ? .trailing : .leading)
+                .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
+                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+                .environment(\.locale, phrase.language.locale)
                 .minimumScaleFactor(0.7)
         }
         .padding(20)
@@ -50,9 +65,11 @@ struct PhraseDetailView: View {
 
     private var translationCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            labeledBlock(persian: "معنی", english: "English", value: phrase.english)
-            Divider().overlay(PhrasePalette.chipStroke)
-            labeledBlock(persian: "آوانگاری", english: "Transliteration", value: phrase.transliteration, italic: true)
+            labeledBlock(title: "English", value: phrase.english)
+            if phrase.showsTransliteration, let transliteration = phrase.transliteration {
+                Divider().overlay(PhrasePalette.chipStroke)
+                labeledBlock(title: "Transliteration", value: transliteration, italic: true)
+            }
         }
         .padding(18)
         .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -60,21 +77,23 @@ struct PhraseDetailView: View {
 
     private var wordSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("کلمه به کلمه · Word by word")
+            Text("Word by word")
                 .font(.headline)
                 .foregroundStyle(PhrasePalette.ink)
 
-            Text("Read right to left, the way the Persian line is written.")
+            Text(rtl
+                 ? "Read right to left, the way this script is written."
+                 : "Tap play to hear the full line. Tokens are a learning aid, not a linguistic parse.")
                 .font(.footnote)
                 .foregroundStyle(PhrasePalette.mutedInk)
 
-            WordBreakdownView(words: phrase.words)
+            WordBreakdownView(words: phrase.words, language: phrase.language)
         }
     }
 
-    private func labeledBlock(persian: String, english: String, value: String, italic: Bool = false) -> some View {
+    private func labeledBlock(title: String, value: String, italic: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(persian) · \(english)")
+            Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(PhrasePalette.sage)
             Text(value)
@@ -87,6 +106,7 @@ struct PhraseDetailView: View {
 
 struct WordBreakdownView: View {
     let words: [Phrase.Word]
+    var language: LearningLanguage = PhraseStore.defaultLanguage
 
     var body: some View {
         VStack(spacing: 10) {
@@ -97,16 +117,18 @@ struct WordBreakdownView: View {
                         .foregroundStyle(PhrasePalette.gold)
                         .frame(width: 18)
 
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(word.persian)
+                    VStack(alignment: language.isRightToLeft ? .trailing : .leading, spacing: 4) {
+                        Text(word.text)
                             .font(.system(.title3, design: .serif, weight: .semibold))
                             .foregroundStyle(PhrasePalette.deepTerracotta)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .environment(\.layoutDirection, .rightToLeft)
-                        Text(word.transliteration)
-                            .font(.subheadline.italic())
-                            .foregroundStyle(PhrasePalette.mutedInk)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: language.isRightToLeft ? .trailing : .leading)
+                            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+                        if language.usesTransliteration, let tr = word.transliteration, !tr.isEmpty {
+                            Text(tr)
+                                .font(.subheadline.italic())
+                                .foregroundStyle(PhrasePalette.mutedInk)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         Text(word.english)
                             .font(.body)
                             .foregroundStyle(PhrasePalette.ink)

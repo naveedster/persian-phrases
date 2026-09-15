@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expand the seed catalog with tagged, grammatical everyday Persian."""
+"""Legacy Persian-only expander. Superseded by ``generate_catalog.py``."""
 
 from __future__ import annotations
 

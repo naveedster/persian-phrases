@@ -2,11 +2,20 @@ import SwiftUI
 import PersianPhrasesKit
 
 struct PhraseListView: View {
+    @EnvironmentObject private var settings: AppPhraseSettings
     @Binding var selectedCategory: Phrase.Category?
     @Binding var query: String
 
     private var phrases: [Phrase] {
-        PhraseStore.search(query, in: selectedCategory)
+        let effective: Phrase.Category? = {
+            guard let selectedCategory else { return nil }
+            return settings.isEnabled(selectedCategory) ? selectedCategory : nil
+        }()
+        return PhraseStore.search(query, category: effective, matching: settings.snapshot)
+    }
+
+    private var enabledCategories: [Phrase.Category] {
+        Phrase.Category.allCases.filter { settings.isEnabled($0) }
     }
 
     var body: some View {
@@ -21,29 +30,50 @@ struct PhraseListView: View {
             .padding(.bottom, 32)
         }
         .background(PhrasePalette.backgroundGradient.ignoresSafeArea())
-        .navigationTitle("عبارات · Phrases")
+        .navigationTitle("Daily Phrases")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(PhrasePalette.cream, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    SettingsView(settings: settings)
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(PhrasePalette.terracotta)
+                }
+                .accessibilityLabel("Settings")
+            }
+        }
         .searchable(
             text: $query,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "جستجو · Search phrases"
+            prompt: "Search phrases"
         )
+        .onChange(of: settings.languageCode) { _, _ in
+            if let selectedCategory, !settings.isEnabled(selectedCategory) {
+                self.selectedCategory = nil
+            }
+        }
+        .onChange(of: settings.enabledCategories) { _, _ in
+            if let selectedCategory, !settings.isEnabled(selectedCategory) {
+                self.selectedCategory = nil
+            }
+        }
     }
 
     private var categoryBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 CategoryChip(
-                    title: "همه · All",
+                    title: "All",
                     symbol: "square.grid.2x2",
                     selected: selectedCategory == nil
                 ) {
                     selectedCategory = nil
                 }
-                ForEach(Phrase.Category.allCases) { category in
+                ForEach(enabledCategories) { category in
                     CategoryChip(
-                        title: "\(category.persianTitle) · \(category.englishTitle)",
+                        title: category.englishTitle,
                         symbol: category.symbolName,
                         selected: selectedCategory == category
                     ) {
@@ -58,10 +88,10 @@ struct PhraseListView: View {
     private var resultsHeader: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Phrase book")
+                Text(settings.language.bilingualName)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(PhrasePalette.ink)
-                Text(selectedCategory?.bilingualTitle ?? "\(PhraseStore.all.count) everyday phrases")
+                Text(selectedCategory?.englishTitle ?? "\(phrases.count) everyday phrases")
                     .font(.subheadline)
                     .foregroundStyle(PhrasePalette.mutedInk)
             }
@@ -77,17 +107,31 @@ struct PhraseListView: View {
 
     @ViewBuilder
     private var phraseCards: some View {
-        if PhraseStore.all.isEmpty {
+        if PhraseStore.concepts.isEmpty {
             EmptyCatalogView()
         } else if phrases.isEmpty {
-            EmptySearchView(query: query)
+            if query.isEmpty {
+                ContentUnavailableView(
+                    "No phrases in these topics",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("Turn on more topics in Settings, or choose All.")
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                EmptySearchView(query: query)
+            }
         } else {
             LazyVStack(spacing: 12) {
                 ForEach(phrases) { phrase in
-                    NavigationLink(value: phrase) {
-                        PhraseRowView(phrase: phrase)
+                    HStack(alignment: .top, spacing: 8) {
+                        NavigationLink(value: phrase) {
+                            PhraseRowView(phrase: phrase)
+                        }
+                        .buttonStyle(.plain)
+                        SpeakButton(phrase: phrase, compact: true)
+                            .padding(.top, 12)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -124,7 +168,7 @@ private struct EmptyCatalogView: View {
         ContentUnavailableView(
             "No phrases loaded",
             systemImage: "text.book.closed",
-            description: Text("The bundled catalog could not be read. Rebuild the app from the PersianPhrasesKit package.")
+            description: Text("The bundled catalog could not be read. Rebuild from the PersianPhrasesKit package.")
         )
         .foregroundStyle(PhrasePalette.mutedInk)
         .frame(maxWidth: .infinity)

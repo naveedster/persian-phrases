@@ -15,21 +15,23 @@ struct Provider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectCategoryIntent, in context: Context) async -> PhraseEntry {
-        PhraseEntry(
+        let settings = PhraseSettingsSnapshot.load()
+        return PhraseEntry(
             date: Date(),
-            phrase: PhraseStore.phrase(for: Date(), category: configuration.resolvedCategory),
+            phrase: PhraseStore.phrase(for: Date(), settings: settings, category: configuration.resolvedCategory),
             category: configuration.category
         )
     }
 
     func timeline(for configuration: SelectCategoryIntent, in context: Context) async -> Timeline<PhraseEntry> {
+        let settings = PhraseSettingsSnapshot.load()
         let now = Date()
         let interval = PhraseStore.refreshInterval
         let entries: [PhraseEntry] = (0..<36).map { index in
             let date = now.addingTimeInterval(interval * Double(index))
             return PhraseEntry(
                 date: date,
-                phrase: PhraseStore.phrase(for: date, category: configuration.resolvedCategory),
+                phrase: PhraseStore.phrase(for: date, settings: settings, category: configuration.resolvedCategory),
                 category: configuration.category
             )
         }
@@ -47,10 +49,10 @@ struct PersianPhrasesWidget: Widget {
             provider: Provider()
         ) { entry in
             PhraseWidgetView(entry: entry)
-                .widgetURL(PhraseDeepLink.url(for: entry.phrase))
+                .widgetURL(PhraseDeepLink.url(for: entry.phrase, autoPlay: true))
         }
-        .configurationDisplayName("Persian Phrase")
-        .description("A rotating everyday Persian phrase on the Home Screen or Lock Screen.")
+        .configurationDisplayName("Daily Phrase")
+        .description("A rotating everyday phrase on the Home Screen or Lock Screen. Language and topics follow the app Settings.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryRectangular, .accessoryInline
@@ -80,20 +82,20 @@ enum CategoryAppEnum: String, AppEnum {
 
     static var caseDisplayRepresentations: [CategoryAppEnum: DisplayRepresentation] {
         [
-            .all: DisplayRepresentation(title: "All phrases", subtitle: "همه"),
-            .greetings: DisplayRepresentation(title: "Greetings", subtitle: "سلام و احوالپرسی"),
-            .polite: DisplayRepresentation(title: "Polite phrases", subtitle: "تعارفات"),
-            .food: DisplayRepresentation(title: "Food & drink", subtitle: "غذا و نوشیدنی"),
-            .travel: DisplayRepresentation(title: "Travel", subtitle: "سفر"),
-            .daily: DisplayRepresentation(title: "Daily life", subtitle: "روزمره"),
-            .shopping: DisplayRepresentation(title: "Shopping", subtitle: "خرید"),
-            .emergency: DisplayRepresentation(title: "Emergency", subtitle: "اضطراری"),
-            .time: DisplayRepresentation(title: "Time & numbers", subtitle: "زمان و اعداد"),
-            .weather: DisplayRepresentation(title: "Weather", subtitle: "آب‌وهوا"),
-            .feelings: DisplayRepresentation(title: "Feelings", subtitle: "احساسات"),
-            .work: DisplayRepresentation(title: "Work & school", subtitle: "کار و درس"),
-            .family: DisplayRepresentation(title: "Family", subtitle: "خانواده"),
-            .health: DisplayRepresentation(title: "Health", subtitle: "سلامت")
+            .all: DisplayRepresentation(title: "Follow app settings"),
+            .greetings: DisplayRepresentation(title: "Greetings"),
+            .polite: DisplayRepresentation(title: "Polite phrases"),
+            .food: DisplayRepresentation(title: "Food & drink"),
+            .travel: DisplayRepresentation(title: "Travel"),
+            .daily: DisplayRepresentation(title: "Daily life"),
+            .shopping: DisplayRepresentation(title: "Shopping"),
+            .emergency: DisplayRepresentation(title: "Emergency"),
+            .time: DisplayRepresentation(title: "Time & numbers"),
+            .weather: DisplayRepresentation(title: "Weather"),
+            .feelings: DisplayRepresentation(title: "Feelings"),
+            .work: DisplayRepresentation(title: "Work & school"),
+            .family: DisplayRepresentation(title: "Family"),
+            .health: DisplayRepresentation(title: "Health")
         ]
     }
 
@@ -119,7 +121,7 @@ enum CategoryAppEnum: String, AppEnum {
 
 struct SelectCategoryIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Phrase category"
-    static var description = IntentDescription("Choose which kind of Persian phrases appear on your Home Screen or Lock Screen.")
+    static var description = IntentDescription("Optionally narrow this widget to one topic. Language and enabled topics still come from Daily Phrases Settings.")
 
     @Parameter(title: "Category")
     var category: CategoryAppEnum
@@ -148,24 +150,6 @@ struct SelectCategoryIntent: WidgetConfigurationIntent {
 }
 
 #Preview(as: .systemLarge) {
-    PersianPhrasesWidget()
-} timeline: {
-    PhraseEntry(date: .now, phrase: PhraseStore.placeholder, category: .all)
-}
-
-#Preview(as: .accessoryCircular) {
-    PersianPhrasesWidget()
-} timeline: {
-    PhraseEntry(date: .now, phrase: PhraseStore.placeholder, category: .all)
-}
-
-#Preview(as: .accessoryRectangular) {
-    PersianPhrasesWidget()
-} timeline: {
-    PhraseEntry(date: .now, phrase: PhraseStore.placeholder, category: .all)
-}
-
-#Preview(as: .accessoryInline) {
     PersianPhrasesWidget()
 } timeline: {
     PhraseEntry(date: .now, phrase: PhraseStore.placeholder, category: .all)
